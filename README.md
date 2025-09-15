@@ -5,7 +5,7 @@
 The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automation tool designed to streamline release management processes by:
 
 - Processing Excel-based release reports from project management systems
-- Validating PAP IDs (Project Action Points) across multiple Git repositories
+- Validating PAP IDs across multiple Git repositories
 - Generating augmented Excel reports with validation status
 - Creating formatted email body text for release communications
 - Supporting multiple repository types with different validation strategies
@@ -28,7 +28,7 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 - Cross-references PAP IDs between Excel data and Git repositories
 - Provides detailed validation status:
   - ✅ **OK**: PAP ID found in appropriate branches
-  - ❌ **Not found**: PAP ID missing from repository
+  - ⚠️ **Not found**: PAP ID missing from repository
   - ⚠️ **Warnings**: Found in unexpected branches or extra commits detected
 
 ### 📧 **Email Body Generation**
@@ -166,11 +166,11 @@ Structured text file with three sections:
 - **⚠️ Warning**: PAP ID found in previous branch (potential issue)
 - **⚠️ Warning**: Extra commits in develop branch not in current branch
 - **⚠️ Warning**: Found in develop but not in current branch
-- **❌ Not found**: PAP ID not found in any branch
+- **⚠️ Not found**: PAP ID not found in any branch
 
 ### Develop-Based Validation (Dovetail/ActionBoard)
 - **✅ OK**: PAP ID found in develop/main/master branch
-- **❌ Not found**: PAP ID not found in develop/main/master branch
+- **⚠️ Not found**: PAP ID not found in develop/main/master branch
 
 ### Orphan Detection
 - Identifies PAP IDs that exist in current branch but are missing from the Excel report

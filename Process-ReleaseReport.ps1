@@ -193,7 +193,7 @@ foreach ($row in $rows) {
                 } elseif ($inDevelop -and -not $inCurrent) {
                     $repoValidation = "⚠️ Found in $($matchingRepo.developBranch) branch but not in $($matchingRepo.currentBranch) branch"
                 } else {
-                    $repoValidation = "❌ Not found"
+                    $repoValidation = "⚠️ Not found"
                 }
             } elseif ($matchingRepo.validationType -eq "develop-based") {
                 # Dovetail and ActionBoard repositories validation (develop branch only)
@@ -203,7 +203,7 @@ foreach ($row in $rows) {
                 if ($inDevelop) {
                     $repoValidation = "✅ OK"
                 } else {
-                    $repoValidation = "❌ Not found"
+                    $repoValidation = "⚠️ Not found"
                 }
             }
             
