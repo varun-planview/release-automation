@@ -1,26 +1,33 @@
 ﻿# Requires: ImportExcel module (Install-Module -Name ImportExcel)
 
-# ------------------ CONFIGURABLE VARIABLES ------------------
-$GitRepoPath = "C:\Dev\pve-web" # <-- set your git repo path
-$BaseURL = "https://planview.leankit.com/card"     # <-- set your base URL
-$CurrentPI = "PRM October 2025"
-$CurrentBranch = "PRM_October2025"
-$PreviousBranch = "PRM_September2025"
-$DevelopBranch = "develop"
+# ------------------ LOAD CONFIGURATION ------------------
+$configPath = Join-Path $PSScriptRoot "config.json"
 
-$nonDevStatuses = @(
-    'FINAL PM / TR / UX REVIEW',
-    'READY FOR TESTING',
-    'TESTING',
-    'READY FOR RELEASE',
-    'READY TO ARCHIVE'
-)
+if (-not (Test-Path $configPath)) {
+    Write-Host "Configuration file not found at: $configPath" -ForegroundColor Red
+    Write-Host "Please ensure config.json exists in the same directory as this script." -ForegroundColor Red
+    exit 1
+}
 
-$qeStatuses = @(
-    'READY FOR TESTING',
-    'TESTING'
-)
-# ------------------------------------------------------------
+try {
+    $config = Get-Content $configPath -Raw | ConvertFrom-Json
+    
+    # Load configuration variables
+    $GitRepoPath = $config.GitRepoPath
+    $BaseURL = $config.BaseURL
+    $CurrentPI = $config.CurrentPI
+    $CurrentBranch = $config.CurrentBranch
+    $PreviousBranch = $config.PreviousBranch
+    $DevelopBranch = $config.DevelopBranch
+    $nonDevStatuses = $config.nonDevStatuses
+    $qeStatuses = $config.qeStatuses
+    
+    Write-Host "Configuration loaded successfully from: $configPath" -ForegroundColor Green
+} catch {
+    Write-Host "Error reading configuration file: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
+# --------------------------------------------------------
 
 # Prompt user to select input file
 Add-Type -AssemblyName System.Windows.Forms

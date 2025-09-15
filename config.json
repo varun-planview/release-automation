@@ -1,0 +1,19 @@
+{
+  "GitRepoPath": "C:\\Dev\\pve-web",
+  "BaseURL": "https://planview.leankit.com/card",
+  "CurrentPI": "PRM October 2025",
+  "CurrentBranch": "PRM_October2025",
+  "PreviousBranch": "PRM_September2025",
+  "DevelopBranch": "develop",
+  "nonDevStatuses": [
+    "FINAL PM / TR / UX REVIEW",
+    "READY FOR TESTING",
+    "TESTING",
+    "READY FOR RELEASE",
+    "READY TO ARCHIVE"
+  ],
+  "qeStatuses": [
+    "READY FOR TESTING",
+    "TESTING"
+  ]
+}
