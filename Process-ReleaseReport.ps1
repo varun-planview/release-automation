@@ -13,16 +13,13 @@ try {
     $config = Get-Content $configPath -Raw | ConvertFrom-Json
     
     # Load configuration variables
-    $GitRepoPath = $config.GitRepoPath
+    $repositories = $config.repositories
     $BaseURL = $config.BaseURL
-    $CurrentPI = $config.CurrentPI
-    $CurrentBranch = $config.CurrentBranch
-    $PreviousBranch = $config.PreviousBranch
-    $DevelopBranch = $config.DevelopBranch
     $nonDevStatuses = $config.nonDevStatuses
     $qeStatuses = $config.qeStatuses
     
     Write-Host "Configuration loaded successfully from: $configPath" -ForegroundColor Green
+    Write-Host "Found $($repositories.Count) repositories configured" -ForegroundColor Green
 } catch {
     Write-Host "Error reading configuration file: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
@@ -61,20 +58,53 @@ $rows = Import-Excel $InputExcelPath
 Write-Host "Filtering unwanted rows..."
 $rows = $rows | Where-Object { $_.'Card ID' -match "\d+" }
 
-Write-Host "Extracting git commit messages for branches..."
-$commitsCurrent = git -C $GitRepoPath log $CurrentBranch --pretty=format:"%s"
-$commitsPrevious = git -C $GitRepoPath log $PreviousBranch --pretty=format:"%s"
-$commitsDevelop = git -C $GitRepoPath log $DevelopBranch --pretty=format:"%s"
+Write-Host "Extracting git commit messages for all repositories..."
+
+# Initialize hash tables for PAP IDs from all repositories
+$allRepositoryCommits = @{}
+
+foreach ($repo in $repositories) {
+    Write-Host "Processing repository: $($repo.name)" -ForegroundColor Cyan
+    
+    if (-not (Test-Path $repo.path)) {
+        Write-Host "Warning: Repository path not found: $($repo.path)" -ForegroundColor Yellow
+        continue
+    }
+    
+    $repoCommits = @{}
+    
+    if ($repo.validationType -eq "branch-based") {
+        # For PRM repo - extract from current, previous, and develop branches
+        $repoCommits.current = git -C $repo.path log $repo.currentBranch --pretty=format:"%s" 2>$null
+        $repoCommits.previous = git -C $repo.path log $repo.previousBranch --pretty=format:"%s" 2>$null
+        $repoCommits.develop = git -C $repo.path log $repo.developBranch --pretty=format:"%s" 2>$null
+    } elseif ($repo.validationType -eq "develop-based") {
+        # For Dovetail and ActionBoard repos - extract from develop branch only
+        $repoCommits.develop = git -C $repo.path log $repo.developBranch --pretty=format:"%s" 2>$null
+    }
+    
+    $allRepositoryCommits[$repo.name] = $repoCommits
+}
 
 Write-Host "Extracting PAP IDs from commits..."
 function Get-PAPIDsFromCommits($commitMessages) {
+    if (-not $commitMessages) { return @() }
     $commitMessages | Select-String -Pattern "PAP-\d+" -AllMatches | ForEach-Object {
         $_.Matches | ForEach-Object { $_.Value }
     } | Select-Object -Unique
 }
-$papCurrent = Get-PAPIDsFromCommits $commitsCurrent
-$papPrevious = Get-PAPIDsFromCommits $commitsPrevious
-$papDevelop = Get-PAPIDsFromCommits $commitsDevelop
+
+# Extract PAP IDs for PVE Web repository (maintaining backward compatibility)
+$pveWebRepo = $repositories | Where-Object { $_.name -eq "PVE Web" }
+if ($pveWebRepo -and $allRepositoryCommits.ContainsKey("PVE Web")) {
+    $papCurrent = Get-PAPIDsFromCommits $allRepositoryCommits["PVE Web"].current
+    $papPrevious = Get-PAPIDsFromCommits $allRepositoryCommits["PVE Web"].previous
+    $papDevelop = Get-PAPIDsFromCommits $allRepositoryCommits["PVE Web"].develop
+} else {
+    $papCurrent = @()
+    $papPrevious = @()
+    $papDevelop = @()
+}
 
 Write-Host "Building lookup for Excel PAP IDs..."
 $excelPapIDs = @{}
@@ -112,37 +142,80 @@ foreach ($row in $rows) {
     }
     $cardAssignees = "$cardUrl - $assigneeNames"
 
-    # Validation Comment
+    # Validation Comment - Check across all repositories
     $validation = ""
-    $piLabels = @()
+    $releaseVersions = @()
     if ($row.'Planning Increment Label') {
-        $piLabels = $row.'Planning Increment Label' -split ',' | ForEach-Object { $_.Trim() }
+        $releaseVersions = $row.'Planning Increment Label' -split ',' | ForEach-Object { $_.Trim() }
     }
-    if ($piLabels -contains $CurrentPI) {
-        $inCurrent = $papCurrent -contains $papId
-        $inPrevious = $papPrevious -contains $papId
-        $inDevelop = $papDevelop -contains $papId
+    
+    # Find ALL repositories that match any release version
+    $matchingRepos = @()
+    foreach ($repo in $repositories) {
+        if ($releaseVersions -contains $repo.releaseVersion) {
+            $matchingRepos += $repo
+        }
+    }
+    
+    if ($matchingRepos.Count -gt 0) {
+        $validationResults = @()
+        
+        foreach ($matchingRepo in $matchingRepos) {
+            $repoCommits = $allRepositoryCommits[$matchingRepo.name]
+            $repoValidation = ""
+            
+            if ($matchingRepo.validationType -eq "branch-based") {
+                # PRM repository validation (existing logic)
+                $papCurrentRepo = Get-PAPIDsFromCommits $repoCommits.current
+                $papPreviousRepo = Get-PAPIDsFromCommits $repoCommits.previous
+                $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
+                
+                $inCurrent = $papCurrentRepo -contains $papId
+                $inPrevious = $papPreviousRepo -contains $papId
+                $inDevelop = $papDevelopRepo -contains $papId
 
-        # Get all commit messages for this PAP ID in each branch
-        $currentCommits = $commitsCurrent | Where-Object { $_ -match $papId }
-        $developCommits = $commitsDevelop | Where-Object { $_ -match $papId }
+                # Get all commit messages for this PAP ID in each branch
+                $currentCommits = $repoCommits.current | Where-Object { $_ -match $papId }
+                $developCommits = $repoCommits.develop | Where-Object { $_ -match $papId }
 
-        if ($inPrevious) {
-            $validation = "⚠️ Found in previous branch: $PreviousBranch"
-        } elseif ($inCurrent -and $inDevelop) {
-            # Check for extra commits in develop
-            $extraDevelopCommits = $developCommits | Where-Object { $currentCommits -notcontains $_ }
-            if ($extraDevelopCommits.Count -gt 0) {
-                $validation = "⚠️ Extra commit(s) in $DevelopBranch branch"
-            } else {
-                $validation = "✅ OK"
+                if ($inPrevious) {
+                    $repoValidation = "⚠️ Found in previous branch: $($matchingRepo.previousBranch)"
+                } elseif ($inCurrent -and $inDevelop) {
+                    # Check for extra commits in develop
+                    $extraDevelopCommits = $developCommits | Where-Object { $currentCommits -notcontains $_ }
+                    if ($extraDevelopCommits.Count -gt 0) {
+                        $repoValidation = "⚠️ Extra commit(s) in $($matchingRepo.developBranch) branch"
+                    } else {
+                        $repoValidation = "✅ OK"
+                    }
+                } elseif ($inCurrent) {
+                    $repoValidation = "✅ OK"
+                } elseif ($inDevelop -and -not $inCurrent) {
+                    $repoValidation = "⚠️ Found in $($matchingRepo.developBranch) branch but not in $($matchingRepo.currentBranch) branch"
+                } else {
+                    $repoValidation = "❌ Not found"
+                }
+            } elseif ($matchingRepo.validationType -eq "develop-based") {
+                # Dovetail and ActionBoard repositories validation (develop branch only)
+                $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
+                $inDevelop = $papDevelopRepo -contains $papId
+                
+                if ($inDevelop) {
+                    $repoValidation = "✅ OK"
+                } else {
+                    $repoValidation = "❌ Not found"
+                }
             }
-        } elseif ($inCurrent) {
-            $validation = "✅ OK"
-        } elseif ($inDevelop -and -not $inCurrent) {
-            $validation = "⚠️ Found in $DevelopBranch branch but not in $CurrentBranch branch"
-        } else {
-            $validation = ""
+            
+            # Add repo-specific validation result
+            if ($repoValidation) {
+                $validationResults += "$($matchingRepo.name) - $repoValidation"
+            }
+        }
+        
+        # Combine all validation results
+        if ($validationResults.Count -gt 0) {
+            $validation = $validationResults -join " | "
         }
     }
 
@@ -153,7 +226,7 @@ foreach ($row in $rows) {
         'Card ID' = $row.'Card ID'
         'Card Type' = $row.'Card Type'
         'Current Lane Title' = $row.'Current Lane Title'
-        'Planning Increment Label' = $row.'Planning Increment Label'
+        'Release Version' = $row.'Planning Increment Label'
         Tags = $row.Tags
         'PAP ID' = $papId
         'Card URL' = $cardUrl
@@ -168,45 +241,63 @@ if ($nextPercent -le 100) {
 Write-Host "" # Move to next line after loop
 
 Write-Host "Detecting orphan PAP IDs..."
-$orphanPapIDs = $papCurrent | Where-Object { 
-    (-not $papPrevious.Contains($_)) -and (-not $excelPapIDs.ContainsKey($_))
-}
-$counter = 0
-foreach ($orphan in $orphanPapIDs) {
-    $counter++
-    $cardId = $orphan -replace "PAP-", ""
-    $cardUrl = "$BaseURL/$cardId"
-    $outputRows += [PSCustomObject]@{
-        Team = ""
-        'Card Title' = ""
-        'Assignee(s)' = ""
-        'Card ID' = $cardId
-        'Card Type' = ""
-        'Current Lane Title' = ""
-        'Planning Increment Label' = ""  # Leave blank for orphan rows
-        Tags = ""
-        'PAP ID' = $orphan
-        'Card URL' = $cardUrl
-        'Validation Comment' = "⚠️ Exists in $CurrentBranch branch but missing in report"
-        'Card Assignee(s)' = ""
+# Only check for orphans in PVE Web repository (branch-based validation)
+if ($pveWebRepo -and $allRepositoryCommits.ContainsKey("PVE Web")) {
+    $orphanPapIDs = $papCurrent | Where-Object { 
+        (-not $papPrevious.Contains($_)) -and (-not $excelPapIDs.ContainsKey($_))
     }
+    $counter = 0
+    foreach ($orphan in $orphanPapIDs) {
+        $counter++
+        $cardId = $orphan -replace "PAP-", ""
+        $cardUrl = "$BaseURL/$cardId"
+        $outputRows += [PSCustomObject]@{
+            Team = ""
+            'Card Title' = ""
+            'Assignee(s)' = ""
+            'Card ID' = $cardId
+            'Card Type' = ""
+            'Current Lane Title' = ""
+            'Release Version' = ""  # Leave blank for orphan rows
+            Tags = ""
+            'PAP ID' = $orphan
+            'Card URL' = $cardUrl
+            'Validation Comment' = "⚠️ Exists in $($pveWebRepo.currentBranch) branch but missing in report"
+            'Card Assignee(s)' = ""
+        }
+    }
+} else {
+    Write-Host "No PVE Web repository configured for orphan detection" -ForegroundColor Yellow
 }
 
 Write-Host "Exporting to Excel..."
 $outputRows | Export-Excel -Path $OutputExcelPath -TableName 'ReleaseTasks' -TableStyle 'None'
 Write-Host "Augmented Excel file created at $OutputExcelPath"
 
-# Helper function to format Card Assignee(s) with PI label if needed
-function FormatAssignee($row, $CurrentPI) {
+# Helper function to format Card Assignee(s) with release version if needed
+function FormatAssignee($row, $allRepositories) {
     $assignee = $row.'Card Assignee(s)'
-    $piLabels = @()
-    if ($row.'Planning Increment Label') {
-        $piLabels = $row.'Planning Increment Label' -split ',' | ForEach-Object { $_.Trim() }
+    $releaseVersions = @()
+    if ($row.'Release Version') {
+        $releaseVersions = $row.'Release Version' -split ',' | ForEach-Object { $_.Trim() }
     }
-    if ($piLabels -contains $CurrentPI) {
+    
+    # Find the PVE Web repository's release version
+    $pveWebReleaseVersion = ""
+    $pveWebRepo = $allRepositories | Where-Object { $_.name -eq "PVE Web" }
+    if ($pveWebRepo) {
+        $pveWebReleaseVersion = $pveWebRepo.releaseVersion
+    }
+    
+    # Check if release versions contain PVE Web's release version
+    $containsPveWebReleaseVersion = $releaseVersions -contains $pveWebReleaseVersion
+    
+    # If it contains PVE Web release version, show assignee without release version
+    # If it contains only non-PVE Web release versions, show assignee with release version
+    if ($containsPveWebReleaseVersion) {
         return $assignee
-    } elseif ($row.'Planning Increment Label') {
-        return "$assignee ($($row.'Planning Increment Label'))"
+    } elseif ($row.'Release Version') {
+        return "$assignee ($($row.'Release Version'))"
     } else {
         return $assignee
     }
@@ -227,7 +318,7 @@ foreach ($group in $todoGroups) {
     if ($group.Name) {
         $emailBody += "$($group.Name):`r`n"
         foreach ($row in $group.Group) {
-            $emailBody += "• $(FormatAssignee $row $CurrentPI)`r`n"
+            $emailBody += "• $(FormatAssignee $row $repositories)`r`n"
         }
         $emailBody += "`r`n"
     }
@@ -246,7 +337,7 @@ foreach ($group in $qeGroups) {
     if ($group.Name) {
         $emailBody += "$($group.Name):`r`n"
         foreach ($row in $group.Group) {
-            $emailBody += "• $(FormatAssignee $row $CurrentPI)`r`n"
+            $emailBody += "• $(FormatAssignee $row $repositories)`r`n"
         }
         $emailBody += "`r`n"
     }
@@ -264,7 +355,7 @@ foreach ($group in $finalGroups) {
     if ($group.Name) {
         $emailBody += "$($group.Name):`r`n"
         foreach ($row in $group.Group) {
-            $emailBody += "• $(FormatAssignee $row $CurrentPI)`r`n"
+            $emailBody += "• $(FormatAssignee $row $repositories)`r`n"
         }
         $emailBody += "`r`n"
     }

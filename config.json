@@ -1,10 +1,30 @@
 {
-  "GitRepoPath": "C:\\Dev\\pve-web",
+  "repositories": [
+    {
+      "name": "PVE Web",
+      "path": "C:\\Dev\\pve-web",
+      "validationType": "branch-based",
+      "releaseVersion": "PRM October 2025",
+      "currentBranch": "PRM_October2025",
+      "previousBranch": "PRM_September2025",
+      "developBranch": "develop"
+    },
+    {
+      "name": "Dovetail",
+      "path": "C:\\Dev\\dovetail",
+      "validationType": "develop-based",
+      "releaseVersion": "Overviews DT 2025.10",
+      "developBranch": "master"
+    },
+    {
+      "name": "ActionBoard",
+      "path": "C:\\Dev\\actionboard-api",
+      "validationType": "develop-based",
+      "releaseVersion": "Overviews AB 2025.10",
+      "developBranch": "main"
+    }
+  ],
   "BaseURL": "https://planview.leankit.com/card",
-  "CurrentPI": "PRM October 2025",
-  "CurrentBranch": "PRM_October2025",
-  "PreviousBranch": "PRM_September2025",
-  "DevelopBranch": "develop",
   "nonDevStatuses": [
     "FINAL PM / TR / UX REVIEW",
     "READY FOR TESTING",
