@@ -71,6 +71,21 @@ foreach ($repo in $repositories) {
         continue
     }
     
+    # Pull latest changes for all required branches
+    Write-Host "Pulling latest changes for $($repo.name)..." -ForegroundColor DarkGray
+    git -C $repo.path fetch --all 2>$null
+    if ($repo.validationType -eq "branch-based") {
+        foreach ($branch in @($repo.currentBranch, $repo.previousBranch, $repo.developBranch)) {
+            Write-Host "  Updating branch: $branch" -ForegroundColor DarkGray
+            git -C $repo.path checkout $branch 2>$null
+            git -C $repo.path pull origin $branch 2>$null
+        }
+    } elseif ($repo.validationType -eq "develop-based") {
+        Write-Host "  Updating branch: $($repo.developBranch)" -ForegroundColor DarkGray
+        git -C $repo.path checkout $repo.developBranch 2>$null
+        git -C $repo.path pull origin $repo.developBranch 2>$null
+    }
+    
     $repoCommits = @{}
     
     if ($repo.validationType -eq "branch-based") {
@@ -158,64 +173,112 @@ foreach ($row in $rows) {
     }
     
     if ($matchingRepos.Count -gt 0) {
-        $validationResults = @()
+        $allValidationResults = @()
         
+        # Group repositories by release version
+        $reposByReleaseVersion = @{}
         foreach ($matchingRepo in $matchingRepos) {
-            $repoCommits = $allRepositoryCommits[$matchingRepo.name]
-            $repoValidation = ""
-            
-            if ($matchingRepo.validationType -eq "branch-based") {
-                # PRM repository validation (existing logic)
-                $papCurrentRepo = Get-PAPIDsFromCommits $repoCommits.current
-                $papPreviousRepo = Get-PAPIDsFromCommits $repoCommits.previous
-                $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
-                
-                $inCurrent = $papCurrentRepo -contains $papId
-                $inPrevious = $papPreviousRepo -contains $papId
-                $inDevelop = $papDevelopRepo -contains $papId
-
-                # Get all commit messages for this PAP ID in each branch
-                $currentCommits = $repoCommits.current | Where-Object { $_ -match $papId }
-                $developCommits = $repoCommits.develop | Where-Object { $_ -match $papId }
-
-                if ($inPrevious) {
-                    $repoValidation = "⚠️ Found in previous branch: $($matchingRepo.previousBranch)"
-                } elseif ($inCurrent -and $inDevelop) {
-                    # Check for extra commits in develop
-                    $extraDevelopCommits = $developCommits | Where-Object { $currentCommits -notcontains $_ }
-                    if ($extraDevelopCommits.Count -gt 0) {
-                        $repoValidation = "⚠️ Extra commit(s) in $($matchingRepo.developBranch) branch"
-                    } else {
-                        $repoValidation = "✅ OK"
-                    }
-                } elseif ($inCurrent) {
-                    $repoValidation = "✅ OK"
-                } elseif ($inDevelop -and -not $inCurrent) {
-                    $repoValidation = "⚠️ Found in $($matchingRepo.developBranch) branch but not in $($matchingRepo.currentBranch) branch"
-                } else {
-                    $repoValidation = "⚠️ Not found"
-                }
-            } elseif ($matchingRepo.validationType -eq "develop-based") {
-                # Dovetail and ActionBoard repositories validation (develop branch only)
-                $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
-                $inDevelop = $papDevelopRepo -contains $papId
-                
-                if ($inDevelop) {
-                    $repoValidation = "✅ OK"
-                } else {
-                    $repoValidation = "⚠️ Not found"
-                }
+            if (-not $reposByReleaseVersion.ContainsKey($matchingRepo.releaseVersion)) {
+                $reposByReleaseVersion[$matchingRepo.releaseVersion] = @()
             }
-            
-            # Add repo-specific validation result
-            if ($repoValidation) {
-                $validationResults += "$($matchingRepo.name) - $repoValidation"
-            }
+            $reposByReleaseVersion[$matchingRepo.releaseVersion] += $matchingRepo
         }
         
-        # Combine all validation results
-        if ($validationResults.Count -gt 0) {
-            $validation = $validationResults -join " | "
+        # Process each release version group separately
+        foreach ($releaseVersion in $reposByReleaseVersion.Keys) {
+            $reposInGroup = $reposByReleaseVersion[$releaseVersion]
+            $successfulRepos = @()
+            $warningRepos = @()
+            $notFoundRepos = @()
+            
+            foreach ($matchingRepo in $reposInGroup) {
+                $repoCommits = $allRepositoryCommits[$matchingRepo.name]
+                $repoValidation = ""
+                $status = ""
+                
+                if ($matchingRepo.validationType -eq "branch-based") {
+                    # PRM repository validation (existing logic)
+                    $papCurrentRepo = Get-PAPIDsFromCommits $repoCommits.current
+                    $papPreviousRepo = Get-PAPIDsFromCommits $repoCommits.previous
+                    $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
+                    
+                    $inCurrent = $papCurrentRepo -contains $papId
+                    $inPrevious = $papPreviousRepo -contains $papId
+                    $inDevelop = $papDevelopRepo -contains $papId
+
+                    # Get all commit messages for this PAP ID in each branch
+                    $currentCommits = $repoCommits.current | Where-Object { $_ -match $papId }
+                    $developCommits = $repoCommits.develop | Where-Object { $_ -match $papId }
+
+                    if ($inPrevious) {
+                        $repoValidation = "⚠️ Found in previous branch: $($matchingRepo.previousBranch)"
+                        $status = "warning"
+                    } elseif ($inCurrent -and $inDevelop) {
+                        # Check for extra commits in develop
+                        $extraDevelopCommits = $developCommits | Where-Object { $currentCommits -notcontains $_ }
+                        if ($extraDevelopCommits.Count -gt 0) {
+                            $repoValidation = "⚠️ Extra commit(s) in $($matchingRepo.developBranch) branch"
+                            $status = "warning"
+                        } else {
+                            $repoValidation = "✅ OK"
+                            $status = "success"
+                        }
+                    } elseif ($inCurrent) {
+                        $repoValidation = "✅ OK"
+                        $status = "success"
+                    } elseif ($inDevelop -and -not $inCurrent) {
+                        $repoValidation = "⚠️ Found in $($matchingRepo.developBranch) branch but not in $($matchingRepo.currentBranch) branch"
+                        $status = "warning"
+                    } else {
+                        $repoValidation = "⚠️ Not found"
+                        $status = "notfound"
+                    }
+                } elseif ($matchingRepo.validationType -eq "develop-based") {
+                    # Dovetail and ActionBoard repositories validation (develop branch only)
+                    $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
+                    $inDevelop = $papDevelopRepo -contains $papId
+                    
+                    if ($inDevelop) {
+                        $repoValidation = "✅ OK"
+                        $status = "success"
+                    } else {
+                        $repoValidation = "⚠️ Not found"
+                        $status = "notfound"
+                    }
+                }
+                
+                # Categorize results by status within this release version group
+                if ($repoValidation) {
+                    $repoResult = "$($matchingRepo.name) - $repoValidation"
+                    if ($status -eq "success") {
+                        $successfulRepos += $repoResult
+                    } elseif ($status -eq "warning") {
+                        $warningRepos += $repoResult
+                    } elseif ($status -eq "notfound") {
+                        $notFoundRepos += $repoResult
+                    }
+                }
+            }
+            
+            # Smart filtering logic per release version group:
+            # 1. If any repos have success or warnings, show only those (hide "not found")
+            # 2. If no repos have success/warnings, show all "not found" repos
+            $groupValidationResults = @()
+            if ($successfulRepos.Count -gt 0 -or $warningRepos.Count -gt 0) {
+                # Show successful and warning repos, hide "not found" ones
+                $groupValidationResults = $successfulRepos + $warningRepos
+            } else {
+                # No successful repos, show all "not found" repos
+                $groupValidationResults = $notFoundRepos
+            }
+            
+            # Add this group's results to the overall results
+            $allValidationResults += $groupValidationResults
+        }
+        
+        # Combine all validation results from all release version groups
+        if ($allValidationResults.Count -gt 0) {
+            $validation = $allValidationResults -join " | "
         }
     }
 

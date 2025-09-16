@@ -10,6 +10,15 @@
       "developBranch": "develop"
     },
     {
+      "name": "PVE Analytics",
+      "path": "C:\\Dev\\pve-analytics\\pve-analytics",
+      "validationType": "branch-based",
+      "releaseVersion": "PRM October 2025",
+      "currentBranch": "PRM_October2025",
+      "previousBranch": "PRM_September2025",
+      "developBranch": "develop"
+    },
+    {
       "name": "Dovetail",
       "path": "C:\\Dev\\dovetail",
       "validationType": "develop-based",
