@@ -1,0 +1,16 @@
+# Local configuration files (may contain sensitive data)
+config.local.json
+
+# Output files
+*_OUTPUT.xlsx
+*_EmailBody.txt
+
+# VS Code settings
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# PowerShell
+*.ps1.bak

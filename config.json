@@ -1,8 +1,14 @@
 {
+  "github": {
+    "apiToken": "YOUR_GITHUB_TOKEN_HERE",
+    "apiBaseUrl": "https://api.github.com",
+    "maxCommitsToFetch": 1000
+  },
   "repositories": [
     {
       "name": "PVE Web",
-      "path": "C:\\Dev\\pve-web",
+      "githubOrg": "pv-e1",
+      "githubRepo": "pve-web",
       "validationType": "branch-based",
       "releaseVersion": "PRM October 2025",
       "currentBranch": "PRM_October2025",
@@ -11,7 +17,8 @@
     },
     {
       "name": "PVE Analytics",
-      "path": "C:\\Dev\\pve-analytics\\pve-analytics",
+      "githubOrg": "pv-e1",
+      "githubRepo": "pve-analytics",
       "validationType": "branch-based",
       "releaseVersion": "PRM October 2025",
       "currentBranch": "PRM_October2025",
@@ -20,14 +27,16 @@
     },
     {
       "name": "Dovetail",
-      "path": "C:\\Dev\\dovetail",
+      "githubOrg": "pv-platforma",
+      "githubRepo": "dovetail",
       "validationType": "develop-based",
       "releaseVersion": "Overviews DT 2025.10",
       "developBranch": "master"
     },
     {
       "name": "ActionBoard",
-      "path": "C:\\Dev\\actionboard-api",
+      "githubOrg": "pv-e1",
+      "githubRepo": "actionboard-api",
       "validationType": "develop-based",
       "releaseVersion": "Overviews AB 2025.10",
       "developBranch": "main"
