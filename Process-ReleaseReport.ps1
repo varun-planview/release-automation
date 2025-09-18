@@ -219,6 +219,29 @@ function Get-GitHubRepoInfo {
     return $repoInfo
 }
 
+function Test-GitHubBranch {
+    param (
+        [string]$owner,
+        [string]$repo,
+        [string]$branch,
+        [string]$token
+    )
+    
+    $headers = @{
+        "Authorization" = "token $token"
+        "Accept" = "application/vnd.github.v3+json"
+        "User-Agent" = "PowerShell-Release-Report"
+    }
+    
+    try {
+        $uri = "$($github.apiBaseUrl)/repos/$owner/$repo/branches/$branch"
+        $branchInfo = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 Write-Host "Extracting commit messages from GitHub API for all repositories..."
 
 # Initialize hash tables for PAP IDs from all repositories
@@ -243,28 +266,52 @@ foreach ($repo in $repositories) {
     
     try {
         if ($repo.validationType -eq "branch-based") {
+            # Check if current branch exists, if not use develop branch as current
+            $currentBranchExists = Test-GitHubBranch -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.currentBranch -token $github.apiToken
+            $effectiveCurrentBranch = $repo.currentBranch
+            
+            if (-not $currentBranchExists) {
+                Write-Host "  Current branch ($($repo.currentBranch)) not found - using develop branch ($($repo.developBranch)) as current" -ForegroundColor Yellow
+                $effectiveCurrentBranch = $repo.developBranch
+            }
+            
             # For branch-based repos - extract from current, previous, and develop branches
-            Write-Host "  Fetching commits from current branch: $($repo.currentBranch)" -ForegroundColor DarkGray
-            $repoCommits.current = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.currentBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+            Write-Host "  Fetching commits from current branch: $effectiveCurrentBranch" -ForegroundColor DarkGray
+            $repoCommits.current = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $effectiveCurrentBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
             
-            Write-Host "  Fetching commits from previous branch: $($repo.previousBranch)" -ForegroundColor DarkGray
-            $repoCommits.previous = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.previousBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+            # Check if previous branch exists before fetching
+            $previousBranchExists = Test-GitHubBranch -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.previousBranch -token $github.apiToken
+            if ($previousBranchExists) {
+                Write-Host "  Fetching commits from previous branch: $($repo.previousBranch)" -ForegroundColor DarkGray
+                $repoCommits.previous = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.previousBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+            } else {
+                Write-Host "  Previous branch ($($repo.previousBranch)) not found - skipping previous branch validation" -ForegroundColor Yellow
+                $repoCommits.previous = @()
+            }
             
-            Write-Host "  Fetching commits from develop branch: $($repo.developBranch)" -ForegroundColor DarkGray
-            $repoCommits.develop = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.developBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+            # Only fetch develop branch separately if it's different from the effective current branch
+            if ($effectiveCurrentBranch -ne $repo.developBranch) {
+                Write-Host "  Fetching commits from develop branch: $($repo.developBranch)" -ForegroundColor DarkGray
+                $repoCommits.develop = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.developBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+                
+                # Get extra commits in develop branch (not in current branch)
+                Write-Host "  Comparing branches for extra commits..." -ForegroundColor DarkGray
+                $repoCommits.extraInDevelop = Compare-GitHubBranches -owner $repo.githubOrg -repo $repo.githubRepo -baseBranch $effectiveCurrentBranch -headBranch $repo.developBranch -token $github.apiToken
+            } else {
+                # If current branch is same as develop, reuse the commits and no extra commits
+                Write-Host "  Using current branch commits as develop branch (same branch)" -ForegroundColor DarkGray
+                $repoCommits.develop = $repoCommits.current
+                $repoCommits.extraInDevelop = @()
+            }
             
-            # Get extra commits in develop branch (not in current branch)
-            Write-Host "  Comparing branches for extra commits..." -ForegroundColor DarkGray
-            $repoCommits.extraInDevelop = Compare-GitHubBranches -owner $repo.githubOrg -repo $repo.githubRepo -baseBranch $repo.currentBranch -headBranch $repo.developBranch -token $github.apiToken
-            
-            # Get repository info for current branch (branch-based uses current branch)
+            # Get repository info for the effective current branch
             Write-Host "  Getting repository info for current branch..." -ForegroundColor DarkGray
-            $branchInfo = Get-GitHubRepoInfo -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.currentBranch -token $github.apiToken
+            $branchInfo = Get-GitHubRepoInfo -owner $repo.githubOrg -repo $repo.githubRepo -branch $effectiveCurrentBranch -token $github.apiToken
             
             # Add to GitHub info collection
             $gitHubRepoInfo += [PSCustomObject]@{
                 'Repository Name' = $repo.name
-                'Branch' = $repo.currentBranch
+                'Branch' = $effectiveCurrentBranch
                 'Last Commit Date' = $branchInfo.LastCommitDate
                 'Open PR Count' = $branchInfo.OpenPRCount
             }

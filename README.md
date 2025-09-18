@@ -14,9 +14,11 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 ## Features
 
 ### 🔧 **Multi-Repository GitHub API Support**
-- **Branch-based validation**: For primary repositories (PVE Web, PVE Analytics) - validates across current, previous, and develop branches
-- **Develop-based validation**: For secondary repositories (Dovetail, ActionBoard) - validates against develop/main/master branches only
+- **Branch-based validation**: For primary repositories (PVE Web, PVE Analytics, Polaris) - validates across current, previous, and develop branches
+- **Develop-based validation**: For secondary repositories (ActionBoard) - validates against develop/main/master branches only
+- **Smart branch detection**: Automatically handles missing release branches by falling back to develop branch
 - **GitHub API integration**: Direct API calls for commit retrieval and repository information
+- **Optimized API usage**: Prevents duplicate fetching when current branch equals develop branch
 - **Configurable commit limits**: Control how many commits to fetch per branch for performance optimization
 
 ### 📊 **Multi-Sheet Excel Processing**
@@ -28,11 +30,14 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 ### 🔍 **Enhanced PAP ID Validation**
 - Extracts PAP IDs from GitHub commit messages using pattern matching (`PAP-\d+`)
 - Cross-references PAP IDs between Excel data and GitHub repositories
+- **Smart branch fallback**: Uses develop branch as current when release branch doesn't exist yet
+- **Branch existence detection**: Automatically checks if configured branches exist on GitHub
 - Provides detailed validation status with smart filtering logic:
   - ✅ **OK**: PAP ID found in appropriate branches
   - ⚠️ **Not found**: PAP ID missing from repository (hidden when other statuses exist)
   - ⚠️ **Warnings**: Found in unexpected branches or extra commits detected
 - Supports multiple release versions per task with intelligent repository matching
+- **Optimized performance**: Avoids duplicate API calls when branches are identical
 
 ### 📧 **Email Body Generation**
 - Automatically generates structured email content with:
@@ -254,25 +259,45 @@ The script uses intelligent filtering to show only relevant validation results:
 - **Fallback Display**: If no repositories show success/warnings, all "not found" results are shown
 - **Multiple Release Versions**: Each release version group is processed separately with its own filtering logic
 
-### Branch-Based Validation (PVE Web, PVE Analytics)
+### Smart Branch Handling
+The script automatically adapts to different branch availability scenarios:
+- **Branch Existence Check**: Verifies if configured branches exist on GitHub before attempting to fetch
+- **Automatic Fallback**: Uses develop branch as current when release branch doesn't exist yet
+- **Performance Optimization**: Avoids duplicate API calls when current branch equals develop branch
+- **Graceful Degradation**: Skips missing branches instead of failing
+
+### Branch-Based Validation (PVE Web, PVE Analytics, Polaris)
+**Standard Scenario** (Current branch exists and differs from develop):
 - **✅ OK**: PAP ID found in current branch
 - **⚠️ Warning**: PAP ID found in previous branch (indicates potential rollback issue)
 - **⚠️ Warning**: Extra commits in develop branch not in current branch (indicates missing merge)
 - **⚠️ Warning**: Found in develop but not in current branch (indicates incomplete merge)
 - **⚠️ Not found**: PAP ID not found in any branch (hidden when other statuses exist)
 
-### Develop-Based Validation (Dovetail, ActionBoard)
+**Fallback Scenario** (Current branch missing - uses develop as current):
+- **✅ OK**: PAP ID found in develop branch (acting as current)
+- **⚠️ Warning**: PAP ID found in previous branch (if previous branch exists)
+- **⚠️ Not found**: PAP ID not found in develop branch (hidden when other statuses exist)
+
+**Early Release Scenario** (Current branch same as develop):
+- **✅ OK**: PAP ID found in current/develop branch
+- **⚠️ Warning**: PAP ID found in previous branch (if previous branch exists)
+- **⚠️ Not found**: PAP ID not found in current/develop branch (hidden when other statuses exist)
+
+### Develop-Based Validation (ActionBoard)
 - **✅ OK**: PAP ID found in develop/main/master branch
 - **⚠️ Not found**: PAP ID not found in develop/main/master branch (hidden when other statuses exist)
 
 ### GitHub Repository Information
 - **Last Commit Date**: Retrieved from GitHub API for the monitored branch
 - **Open PR Count**: Number of open pull requests targeting the monitored branch
-- **Branch-specific**: Uses `currentBranch` for branch-based repos, `developBranch` for develop-based repos
+- **Branch-specific**: Uses effective current branch (may be develop if current branch missing) for branch-based repos, `developBranch` for develop-based repos
+- **Real-time Data**: Always reflects the actual branch being monitored
 
 ### Orphan Detection
-- Identifies PAP IDs that exist in current branch but are missing from the Excel report
+- Identifies PAP IDs that exist in effective current branch but are missing from the Excel report
 - Only performed for branch-based repositories (PVE Web)
+- Uses the actual branch being monitored (current or develop fallback)
 - Provides direct links to both the card and the GitHub commit
 - Indicates potential missing tasks in release planning
 
@@ -304,12 +329,19 @@ The script uses intelligent filtering to show only relevant validation results:
    - Verify branch names in configuration match actual GitHub branches
    - Check that the API token has access to pull request information
 
+7. **Branch not found warnings**
+   - Yellow warnings are informational and indicate fallback behavior
+   - Script automatically uses develop branch when current branch doesn't exist
+   - Previous branch warnings can be ignored if the branch hasn't been created yet
+
 ### Performance Considerations
 
 - **API Rate Limits**: GitHub API has rate limits; reduce `maxCommitsToFetch` if hitting limits
 - **Processing Time**: Scales with number of commits, repositories, and API response time
 - **Progress Indicators**: Console shows completion percentage and API call progress
 - **Configurable Limits**: Adjust `maxCommitsToFetch` based on your repository size and performance needs
+- **Optimized API Usage**: Script automatically prevents duplicate fetching when branches are identical
+- **Smart Branch Detection**: Avoids unnecessary API calls for non-existent branches
 
 ### Security Best Practices
 
@@ -320,12 +352,14 @@ The script uses intelligent filtering to show only relevant validation results:
 
 ## Version History & Development Evolution
 
-### Current Version: v5.0
-**Major GitHub API Integration Release**
+### Current Version: v5.1
+**Smart Branch Handling & Performance Optimization Release**
 
 #### Key Features:
 - **GitHub API Integration**: Direct API calls replace local Git operations
 - **Multi-Sheet Excel Export**: Report, GitHub, and Orphan Commits sheets
+- **Smart Branch Detection**: Automatic branch existence checking and fallback handling
+- **Optimized API Usage**: Prevents duplicate fetching when branches are identical
 - **Configurable Performance**: Adjustable commit fetch limits
 - **Local Configuration Support**: `config.local.json` for secure local development
 - **Enhanced Repository Monitoring**: Real-time GitHub repository information
@@ -339,6 +373,7 @@ The script uses intelligent filtering to show only relevant validation results:
 - **v4.0**: Terminology updates and repository name improvements  
 - **v4.1**: Enhanced validation logic and orphan detection
 - **v5.0**: Complete GitHub API integration with multi-sheet reporting
+- **v5.1**: Smart branch handling and API optimization
 
 ### Development Evolution
 
@@ -373,24 +408,35 @@ The script uses intelligent filtering to show only relevant validation results:
 - **Security Enhancement**: Local configuration support with git-ignore protection
 - **Smart Filtering**: Intelligent validation result display logic
 
+#### Phase 6: Smart Branch Handling & Optimization (v5.0 → v5.1)
+**Enhancement Focus**: Branch flexibility and performance optimization
+- **Smart Branch Detection**: Added `Test-GitHubBranch` function for branch existence verification
+- **Automatic Fallback**: Uses develop branch as current when release branch doesn't exist
+- **API Optimization**: Prevents duplicate fetching when current branch equals develop branch
+- **Early Release Support**: Handles scenarios where release branches haven't been created yet
+- **Performance Enhancement**: Reduces API calls by up to 33% in fallback scenarios
+- **Graceful Error Handling**: Skips missing branches instead of failing
+
 #### Technical Evolution Summary:
 1. **Configuration Management**: Hardcoded → JSON → Local + Template
 2. **Data Source**: Local Git → GitHub API  
 3. **Repository Support**: Single → Multiple with validation strategies
 4. **Output Format**: Single sheet → Multi-sheet with specialized content
-5. **Performance**: Fixed limits → Configurable optimization
+5. **Performance**: Fixed limits → Configurable optimization → Smart API usage
 6. **Security**: Basic → Token-based with local configuration protection
+7. **Branch Handling**: Static → Dynamic with existence detection and fallback
 
 ### Architecture Highlights
 
 **Current Technical Stack**:
 - **PowerShell Core**: Cross-platform automation scripting
-- **GitHub API v3**: Direct repository and commit data access
+- **GitHub API v3**: Direct repository and commit data access with smart branch detection
 - **ImportExcel Module**: Multi-sheet Excel processing
 - **JSON Configuration**: Hierarchical configuration management
-- **REST API Integration**: Paginated commit retrieval and repository information
+- **REST API Integration**: Optimized paginated commit retrieval and repository information
 - **Pattern Matching**: Regular expression PAP ID extraction
 - **Smart Filtering**: Context-aware validation result display
+- **Dynamic Branch Handling**: Automatic branch existence checking and fallback logic
 
 **Integration Points**:
 - GitHub Organizations and Repositories

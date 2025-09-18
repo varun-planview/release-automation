@@ -16,6 +16,16 @@
       "developBranch": "develop"
     },
     {
+      "name": "Polaris",
+      "githubOrg": "pv-e1",
+      "githubRepo": "polaris",
+      "validationType": "branch-based",
+      "releaseVersion": "PRM October 2025",
+      "currentBranch": "release/2025.10.0",
+      "previousBranch": "release/2025.9.0",
+      "developBranch": "develop"
+    },
+    {
       "name": "PVE Analytics",
       "githubOrg": "pv-e1",
       "githubRepo": "pve-analytics",
@@ -29,8 +39,10 @@
       "name": "Dovetail",
       "githubOrg": "pv-platforma",
       "githubRepo": "dovetail",
-      "validationType": "develop-based",
+      "validationType": "branch-based",
       "releaseVersion": "Overviews DT 2025.10",
+      "currentBranch": "master",
+      "previousBranch": "portfolios-september-2025-release",
       "developBranch": "master"
     },
     {
