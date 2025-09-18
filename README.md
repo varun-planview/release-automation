@@ -34,7 +34,7 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 - **Branch existence detection**: Automatically checks if configured branches exist on GitHub
 - Provides detailed validation status with smart filtering logic:
   - ✅ **OK**: PAP ID found in appropriate branches
-  - ⚠️ **Not found**: PAP ID missing from repository (hidden when other statuses exist)
+  - ⚠️ **Not found**: PAP ID missing from repository
   - ⚠️ **Warnings**: Found in unexpected branches or extra commits detected
 - Supports multiple release versions per task with intelligent repository matching
 - **Optimized performance**: Avoids duplicate API calls when branches are identical
@@ -269,24 +269,24 @@ The script automatically adapts to different branch availability scenarios:
 ### Branch-Based Validation (PVE Web, PVE Analytics, Polaris)
 **Standard Scenario** (Current branch exists and differs from develop):
 - **✅ OK**: PAP ID found in current branch
-- **⚠️ Warning**: PAP ID found in previous branch (indicates potential rollback issue)
-- **⚠️ Warning**: Extra commits in develop branch not in current branch (indicates missing merge)
-- **⚠️ Warning**: Found in develop but not in current branch (indicates incomplete merge)
-- **⚠️ Not found**: PAP ID not found in any branch (hidden when other statuses exist)
+- **⚠️ Warning**: PAP ID found in previous branch (indicates same card being used for multiple releases)
+- **⚠️ Warning**: Extra commits in develop branch not in current branch (indicates extra changes in develop compared to current branch)
+- **⚠️ Warning**: Found in develop but not in current branch (indicates changes are in develop but card pointing to current release)
+- **⚠️ Not found**: PAP ID not found in any branch
 
 **Fallback Scenario** (Current branch missing - uses develop as current):
 - **✅ OK**: PAP ID found in develop branch (acting as current)
-- **⚠️ Warning**: PAP ID found in previous branch (if previous branch exists)
-- **⚠️ Not found**: PAP ID not found in develop branch (hidden when other statuses exist)
+- **⚠️ Warning**: PAP ID found in previous branch (indicates same card being used for multiple releases)
+- **⚠️ Not found**: PAP ID not found in develop branch
 
 **Early Release Scenario** (Current branch same as develop):
 - **✅ OK**: PAP ID found in current/develop branch
-- **⚠️ Warning**: PAP ID found in previous branch (if previous branch exists)
-- **⚠️ Not found**: PAP ID not found in current/develop branch (hidden when other statuses exist)
+- **⚠️ Warning**: PAP ID found in previous branch (indicates same card being used for multiple releases)
+- **⚠️ Not found**: PAP ID not found in current/develop branch
 
 ### Develop-Based Validation (ActionBoard)
 - **✅ OK**: PAP ID found in develop/main/master branch
-- **⚠️ Not found**: PAP ID not found in develop/main/master branch (hidden when other statuses exist)
+- **⚠️ Not found**: PAP ID not found in develop/main/master branch
 
 ### GitHub Repository Information
 - **Last Commit Date**: Retrieved from GitHub API for the monitored branch
