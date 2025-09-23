@@ -406,7 +406,7 @@ foreach ($row in $rows) {
     }
     $cardAssignees = "$cardUrl - $assigneeNames"
 
-    # Validation Comment - Check across all repositories
+    # Commit Status - Check across all repositories
     $validation = ""
     $releaseVersions = @()
     if ($row.'Planning Increment Label') {
@@ -415,9 +415,12 @@ foreach ($row in $rows) {
     
     # Find ALL repositories that match any release version
     $matchingRepos = @()
+    $nonMatchingRepos = @()
     foreach ($repo in $repositories) {
         if ($releaseVersions -contains $repo.releaseVersion) {
             $matchingRepos += $repo
+        } else {
+            $nonMatchingRepos += $repo
         }
     }
     
@@ -462,12 +465,12 @@ foreach ($row in $rows) {
                     }
 
                     if ($inPrevious) {
-                        $repoValidation = "⚠️ Found in previous branch: $($matchingRepo.previousBranch)"
+                        $repoValidation = "⚠️ In previous"
                         $status = "warning"
                     } elseif ($inCurrent -and $inDevelop) {
                         # Check for extra commits in develop using API comparison
                         if ($extraCommitsInDevelop.Count -gt 0) {
-                            $repoValidation = "⚠️ Extra commit(s) in $($matchingRepo.developBranch) branch"
+                            $repoValidation = "⚠️ Extra commits"
                             $status = "warning"
                         } else {
                             $repoValidation = "✅ OK"
@@ -477,10 +480,10 @@ foreach ($row in $rows) {
                         $repoValidation = "✅ OK"
                         $status = "success"
                     } elseif ($inDevelop -and -not $inCurrent) {
-                        $repoValidation = "⚠️ Found in $($matchingRepo.developBranch) branch but not in $($matchingRepo.currentBranch) branch"
+                        $repoValidation = "⚠️ Only in develop"
                         $status = "warning"
                     } else {
-                        $repoValidation = "⚠️ Not found"
+                        $repoValidation = "⚠️ Missing"
                         $status = "notfound"
                     }
                 } elseif ($matchingRepo.validationType -eq "develop-based") {
@@ -492,7 +495,7 @@ foreach ($row in $rows) {
                         $repoValidation = "✅ OK"
                         $status = "success"
                     } else {
-                        $repoValidation = "⚠️ Not found"
+                        $repoValidation = "⚠️ Missing"
                         $status = "notfound"
                     }
                 }
@@ -526,6 +529,38 @@ foreach ($row in $rows) {
             $allValidationResults += $groupValidationResults
         }
         
+        # Check non-matching repositories for unexpected commits
+        $unexpectedRepos = @()
+        foreach ($nonMatchingRepo in $nonMatchingRepos) {
+            $repoCommits = $allRepositoryCommits[$nonMatchingRepo.name]
+            
+            if ($nonMatchingRepo.validationType -eq "branch-based") {
+                # Check branch-based repository for unexpected commits
+                $papCurrentRepo = Get-PAPIDsFromCommits $repoCommits.current
+                $papPreviousRepo = Get-PAPIDsFromCommits $repoCommits.previous
+                $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
+                
+                $inCurrent = $papCurrentRepo -contains $papId
+                $inPrevious = $papPreviousRepo -contains $papId
+                $inDevelop = $papDevelopRepo -contains $papId
+                
+                if ($inCurrent -or $inPrevious -or $inDevelop) {
+                    $unexpectedRepos += "$($nonMatchingRepo.name) - ⚠️ Unexpected"
+                }
+            } elseif ($nonMatchingRepo.validationType -eq "develop-based") {
+                # Check develop-based repository for unexpected commits
+                $papDevelopRepo = Get-PAPIDsFromCommits $repoCommits.develop
+                $inDevelop = $papDevelopRepo -contains $papId
+                
+                if ($inDevelop) {
+                    $unexpectedRepos += "$($nonMatchingRepo.name) - ⚠️ Unexpected"
+                }
+            }
+        }
+        
+        # Add unexpected repository results to overall validation
+        $allValidationResults += $unexpectedRepos
+        
         # Combine all validation results from all release version groups
         if ($allValidationResults.Count -gt 0) {
             $validation = $allValidationResults -join " | "
@@ -543,7 +578,7 @@ foreach ($row in $rows) {
         Tags = $row.Tags
         'PAP ID' = $papId
         'Card URL' = $cardUrl
-        'Validation Comment' = $validation
+        'Commit Status' = $validation
         'Card Assignee(s)' = $cardAssignees
     }
 }
@@ -581,7 +616,7 @@ if ($pveWebRepo -and $allRepositoryCommits.ContainsKey("PVE Web")) {
             'PAP ID' = $orphan
             'Card URL' = $cardUrl
             'Commit URL' = $commitUrl
-            'Validation Comment' = "⚠️ Exists in $($pveWebRepo.currentBranch) branch but missing in report"
+            'Commit Status' = "⚠️ Orphaned commit"
         }
     }
 } else {
