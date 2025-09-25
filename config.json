@@ -41,7 +41,7 @@
       "githubRepo": "dovetail",
       "validationType": "branch-based",
       "releaseVersion": "Overviews DT 2025.10",
-      "currentBranch": "master",
+      "currentBranch": "portfolios-october-2025-release",
       "previousBranch": "portfolios-september-2025-release",
       "developBranch": "master"
     },

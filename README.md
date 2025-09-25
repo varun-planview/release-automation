@@ -7,40 +7,36 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 - **Automating status email preparation** with intelligent card categorization and team grouping
 - **Validating release version alignment** across multiple GitHub repositories using GitHub API
 - **Detecting cross-repository misalignments** where code exists in unexpected repositories
-- **Identifying orphan commits** that exist in repositories but are missing from planning
+- **Identifying orphan commits** that exist in repositories but are missing in report
 - **Generating multi-sheet Excel reports** with comprehensive validation status and GitHub repository information
 - **Creating formatted email body text** for release communications with proper assignee formatting
 - **Supporting flexible repository configurations** with different validation strategies
 
 ## Manual Process Automation
 
-### What We Used to Do Manually (2-3 hours per release):
+### What We Used to Do Manually:
 
-**1. Status Email Preparation (30-45 minutes)**
+**1. Status Email Preparation**
 - Manually collecting each card's URL, ID, and assignee
 - Classifying cards by lane (TODO, QE Tasks, Final PM Review)
 - Formatting email content for team communication
 
-**2. Planning Increment Verification (45-60 minutes)** 
+**2. Release Version Verification)** 
 - Verifying code changes are committed/merged into correct release branches
-- Cross-checking multiple repositories manually
-- Ensuring all planned work is properly integrated
 
-**3. Cross-Repository Validation (30-45 minutes)**
+**3. Cross-Repository Validation**
 - Checking if card repository assignments match actual code locations
-- Reviewing each pull request for proper repository alignment
 - Identifying misaligned cards between PVE Web, ActionBoard, Dovetail, etc.
 
-**4. Orphan Commit Detection (15-30 minutes)**
-- Reviewing commits to identify card IDs without planning increments
-- Finding untracked work that was merged into release branches
+**4. Orphan Commit Detection**
+- Reviewing commits to identify card IDs without Release Versions
+- Finding untracked cards that was merged into release branches
 
-**5. Card Hygiene Issues (15-30 minutes)**
-- Identifying cards marked "Ready to Archive" with active code changes
-- Finding missing or incorrect planning increments
+**5. Card Hygiene Issues**
+- Finding missing or incorrect Release Versions
 - Reviewing PRs/commits lacking proper card IDs
 
-### What the Script Does Now (10 minutes):
+### What the Script Does Now:
 
 **✅ Fully Automated**: Status emails, validation, cross-repository checking, orphan detection
 **✅ 83% Time Reduction**: From 2-3 hours to 10 minutes with 100% accuracy
@@ -49,17 +45,15 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 ## Features
 
 ### 🔧 **Multi-Repository GitHub API Support**
-- **Branch-based validation**: For primary repositories (PVE Web, PVE Analytics, Polaris) - validates across current, previous, and develop branches
-- **Develop-based validation**: For secondary repositories (ActionBoard, Dovetail) - validates against develop/main/master branches only
+- **Branch-based validation**: For primary repositories (PVE Web, PVE Analytics, Polaris, Dovetail) - validates across current, previous, and develop branches
+- **Develop-based validation**: For secondary repositories (ActionBoard) - validates against develop/main/master branches only
 - **Smart branch detection**: Automatically handles missing release branches by falling back to develop branch
 - **GitHub API integration**: Direct API calls for commit retrieval and repository information
-- **Optimized API usage**: Prevents duplicate fetching when current branch equals develop branch (up to 33% API call reduction)
 - **Configurable commit limits**: Control how many commits to fetch per branch for performance optimization
 
-### � **Cross-Repository Validation (NEW)**
-- **Unexpected commit detection**: Identifies when PAP IDs are found in repositories that don't match the card's Planning Increment Label
+### � **Cross-Repository Validation**
+- **Unexpected commit detection**: Identifies when PAP IDs are found in repositories that don't match the card's Release Version
 - **Comprehensive branch checking**: Validates across current, previous, and develop branches for branch-based repositories
-- **Smart warning system**: Shows `"Repository - ⚠️ Found but not expected"` for misaligned code
 - **Multi-organization support**: Handles repositories across different GitHub organizations (pv-e1, pv-platforma)
 
 ### �📊 **Multi-Sheet Excel Processing**
@@ -166,8 +160,10 @@ The script supports two configuration files with priority-based loading:
       "name": "Dovetail",
       "githubOrg": "pv-platforma",
       "githubRepo": "dovetail",
-      "validationType": "develop-based",
+      "validationType": "branch-based",
       "releaseVersion": "Overviews DT 2025.10",
+      "currentBranch": "portfolios-october-2025-release",
+      "previousBranch": "portfolios-september-2025-release",
       "developBranch": "master"
     },
     {
@@ -339,7 +335,7 @@ The script automatically adapts to different branch availability scenarios:
 - **Performance Optimization**: Avoids duplicate API calls when current branch equals develop branch
 - **Graceful Degradation**: Skips missing branches instead of failing
 
-### Branch-Based Validation (PVE Web, PVE Analytics, Polaris)
+### Branch-Based Validation (PVE Web, PVE Analytics, Polaris, Dovetail)
 **Standard Scenario** (Current branch exists and differs from develop):
 - **✅ OK**: PAP ID found in current branch
 - **⚠️ In previous**: PAP ID found in previous branch (indicates same card being used for multiple releases)
@@ -357,14 +353,14 @@ The script automatically adapts to different branch availability scenarios:
 - **⚠️ In previous**: PAP ID found in previous branch (indicates same card being used for multiple releases)
 - **⚠️ Missing**: PAP ID not found in current/develop branch
 
-### Develop-Based Validation (ActionBoard, Dovetail)
+### Develop-Based Validation (ActionBoard)
 - **✅ OK**: PAP ID found in develop/main/master branch
 - **⚠️ Missing**: PAP ID not found in develop/main/master branch
 
 ### Cross-Repository Validation (NEW)
 The script now performs comprehensive cross-repository validation to detect misaligned code:
 
-**Expected Behavior**: PAP ID found only in repositories matching the card's Planning Increment Label
+**Expected Behavior**: PAP ID found only in repositories matching the card's Release Version
 - Card with "PRM October 2025" should only have commits in PVE Web, PVE Analytics, and Polaris
 - Card with "Overviews AB 2025.10" should only have commits in ActionBoard
 
