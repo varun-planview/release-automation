@@ -262,6 +262,9 @@ foreach ($repo in $repositories) {
         continue
     }
     
+    # Use repository-specific maxCommitsToFetch if available, otherwise use default from github config
+    $maxCommits = if ($repo.maxCommitsToFetch) { $repo.maxCommitsToFetch } else { $github.maxCommitsToFetch }
+    
     $repoCommits = @{}
     
     try {
@@ -277,13 +280,13 @@ foreach ($repo in $repositories) {
             
             # For branch-based repos - extract from current, previous, and develop branches
             Write-Host "  Fetching commits from current branch: $effectiveCurrentBranch" -ForegroundColor DarkGray
-            $repoCommits.current = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $effectiveCurrentBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+            $repoCommits.current = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $effectiveCurrentBranch -token $github.apiToken -maxCommits $maxCommits
             
             # Check if previous branch exists before fetching
             $previousBranchExists = Test-GitHubBranch -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.previousBranch -token $github.apiToken
             if ($previousBranchExists) {
                 Write-Host "  Fetching commits from previous branch: $($repo.previousBranch)" -ForegroundColor DarkGray
-                $repoCommits.previous = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.previousBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+                $repoCommits.previous = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.previousBranch -token $github.apiToken -maxCommits $maxCommits
             } else {
                 Write-Host "  Previous branch ($($repo.previousBranch)) not found - skipping previous branch validation" -ForegroundColor Yellow
                 $repoCommits.previous = @()
@@ -319,7 +322,7 @@ foreach ($repo in $repositories) {
         } elseif ($repo.validationType -eq "develop-based") {
             # For develop-based repos - extract from develop branch only
             Write-Host "  Fetching commits from develop branch: $($repo.developBranch)" -ForegroundColor DarkGray
-            $repoCommits.develop = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.developBranch -token $github.apiToken -maxCommits $github.maxCommitsToFetch
+            $repoCommits.develop = Get-GitHubCommits -owner $repo.githubOrg -repo $repo.githubRepo -branch $repo.developBranch -token $github.apiToken -maxCommits $maxCommits
             
             # Get repository info for develop branch (develop-based uses develop branch)
             Write-Host "  Getting repository info for develop branch..." -ForegroundColor DarkGray

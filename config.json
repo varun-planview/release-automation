@@ -2,7 +2,7 @@
   "github": {
     "apiToken": "YOUR_GITHUB_TOKEN_HERE",
     "apiBaseUrl": "https://api.github.com",
-    "maxCommitsToFetch": 1000
+    "maxCommitsToFetch": 500
   },
   "repositories": [
     {
@@ -13,7 +13,8 @@
       "releaseVersion": "PRM October 2025",
       "currentBranch": "PRM_October2025",
       "previousBranch": "PRM_September2025",
-      "developBranch": "develop"
+      "developBranch": "develop",
+      "maxCommitsToFetch": 2000
     },
     {
       "name": "Polaris",
