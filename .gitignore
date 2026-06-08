@@ -4,6 +4,14 @@ config.local.json
 # Output files
 *_OUTPUT.xlsx
 *_EmailBody.txt
+*_report.html
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
 
 # VS Code settings
 .vscode/

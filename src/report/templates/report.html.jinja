@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Release Validation Report — {{ meta.input_filename }}</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    --accent: #3b82f6;
+    --accent-dark: #1d4ed8;
+    --ok-bg: #f0fdf4;
+    --ok-text: #166534;
+    --ok-border: #bbf7d0;
+    --ok-badge: #22c55e;
+    --warn-bg: #fffbeb;
+    --warn-text: #92400e;
+    --warn-border: #fde68a;
+    --warn-badge: #f59e0b;
+    --miss-bg: #fef2f2;
+    --miss-text: #991b1b;
+    --miss-border: #fecaca;
+    --miss-badge: #ef4444;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; font-size: 14px; }
+
+  /* ── Header ── */
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%); color: #fff; padding: 28px 32px 24px; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 6px; }
+  .header-meta { display: flex; gap: 20px; flex-wrap: wrap; opacity: .85; font-size: 13px; }
+  .header-meta span { display: flex; align-items: center; gap: 5px; }
+
+  /* ── Layout ── */
+  .container { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; }
+  .section-header { padding: 14px 20px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; }
+  .section-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .section-body { padding: 20px; }
+
+  /* ── Summary Cards ── */
+  .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .stat-card.ok { border-top: 3px solid var(--ok-badge); }
+  .stat-card.warning { border-top: 3px solid var(--warn-badge); }
+  .stat-card.missing { border-top: 3px solid var(--miss-badge); }
+  .stat-card.orphan { border-top: 3px solid #8b5cf6; }
+  .stat-card.total { border-top: 3px solid var(--accent); }
+  .stat-card.nodata { border-top: 3px solid var(--text-light); }
+  .stat-value { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-card.ok .stat-value { color: var(--ok-badge); }
+  .stat-card.warning .stat-value { color: var(--warn-badge); }
+  .stat-card.missing .stat-value { color: var(--miss-badge); }
+  .stat-card.orphan .stat-value { color: #8b5cf6; }
+  .stat-card.total .stat-value { color: var(--accent); }
+  .stat-card.nodata .stat-value { color: var(--text-muted); }
+  .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* ── Repo Status Bar ── */
+  .repo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .repo-card { border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .repo-card.fallback { border-color: var(--warn-border); background: var(--warn-bg); }
+  .repo-name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .repo-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-ok { background: var(--ok-badge); }
+  .dot-warn { background: var(--warn-badge); }
+  .repo-meta { font-size: 12px; color: var(--text-muted); display: flex; flex-direction: column; gap: 3px; }
+  .repo-meta code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: var(--border-light); padding: 1px 5px; border-radius: 3px; color: var(--text); }
+  .pr-badge { display: inline-flex; align-items: center; gap: 3px; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; }
+
+  /* ── Filter Bar ── */
+  .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 20px; background: var(--bg); border-bottom: 1px solid var(--border-light); }
+  .filter-bar input, .filter-bar select { border: 1px solid var(--border); border-radius: 5px; padding: 5px 10px; font-size: 13px; background: var(--surface); color: var(--text); outline: none; }
+  .filter-bar input:focus, .filter-bar select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+  .filter-bar input { width: 160px; }
+  .status-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+  .status-btn { border: 1px solid var(--border); border-radius: 5px; padding: 4px 12px; font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text-muted); font-weight: 500; transition: all .15s; }
+  .status-btn:hover { background: var(--bg); }
+  .status-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .status-btn.active-ok { background: var(--ok-badge); border-color: var(--ok-badge); color: #fff; }
+  .status-btn.active-error { background: var(--miss-badge); border-color: var(--miss-badge); color: #fff; }
+  .status-btn.active-notfound { background: var(--warn-badge); border-color: var(--warn-badge); color: #fff; }
+  .filter-label { font-size: 12px; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+  .clear-btn { margin-left: auto; border: 1px solid var(--border); border-radius: 5px; padding: 4px 12px; font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text-muted); transition: all .15s; }
+  .clear-btn:hover { background: var(--miss-bg); color: var(--miss-text); border-color: var(--miss-border); }
+  .row-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+  /* ── Main Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  col.col-team { width: 110px; }
+  col.col-title { width: 260px; }
+  col.col-lane { width: 175px; }
+  col.col-release { width: 155px; }
+  col.col-status { width: auto; }
+  thead th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; background: var(--bg); border-bottom: 2px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; position: sticky; top: 0; z-index: 1; overflow: hidden; text-overflow: ellipsis; }
+  thead th:hover { background: var(--border-light); color: var(--text); }
+  thead th.sorted-asc::after { content: ' ↑'; }
+  thead th.sorted-desc::after { content: ' ↓'; }
+  tbody tr { border-bottom: 1px solid var(--border-light); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover td { filter: brightness(0.97); }
+  td { padding: 8px 14px; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-ok { background: var(--ok-bg); }
+  .row-warning { background: var(--warn-bg); }
+  .row-missing { background: var(--miss-bg); }
+  .row-nodata { background: var(--surface); }
+  .card-link { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .card-link:hover { text-decoration: underline; }
+
+  /* ── Status Badges ── */
+  .badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 600; white-space: nowrap; margin: 2px 2px 2px 0; }
+  .badge-ok { background: #dcfce7; color: #15803d; }
+  .badge-warning { background: #fef9c3; color: #a16207; }
+  .badge-error { background: #fee2e2; color: #b91c1c; }
+  .badge-missing { background: #fee2e2; color: #b91c1c; }
+  .badge-nodata { background: var(--border-light); color: var(--text-muted); }
+  .status-cell { display: flex; flex-wrap: wrap; gap: 2px; min-width: 200px; }
+  .row-error { background: var(--miss-bg); }
+
+  /* ── Status Legend ── */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 20px; background: var(--bg); border-bottom: 1px solid var(--border-light); font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; color: var(--text-muted); }
+  .legend-sep { color: var(--border); }
+
+  /* ── Collapsible details ── */
+  details { margin-bottom: 16px; }
+  details:last-child { margin-bottom: 0; }
+  summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; padding: 12px 16px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--border); user-select: none; }
+  summary:hover { background: var(--border-light); }
+  summary::before { content: '▶'; font-size: 10px; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details[open] summary { border-radius: var(--radius) var(--radius) 0 0; border-bottom: none; }
+  .details-body { border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); padding: 0; overflow: hidden; }
+  .details-body table { font-size: 12px; }
+  .details-body thead th { font-size: 11px; }
+  .details-body td { padding: 8px 14px; }
+
+  /* ── Email body ── */
+  .email-wrap { position: relative; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; border: 1px solid var(--border); border-radius: 5px; padding: 5px 14px; font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text-muted); transition: all .2s; }
+  .copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .copy-btn.copied { background: var(--ok-badge); color: #fff; border-color: var(--ok-badge); }
+  pre.email-pre { background: #0f172a; color: #e2e8f0; font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 12.5px; padding: 40px 20px 20px; border-radius: var(--radius); overflow-x: auto; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+
+  /* ── Misc ── */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-icon { font-size: 32px; margin-bottom: 8px; }
+  .tag { display: inline-block; background: var(--border-light); color: var(--text-muted); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+  .footer { text-align: center; color: var(--text-light); font-size: 12px; padding: 24px 0; }
+  .hidden { display: none !important; }
+  .chip-warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 500; }
+
+  @media (max-width: 900px) {
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+
+    .container { padding: 16px; }
+  }
+  @media (max-width: 600px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .filter-bar { flex-direction: column; align-items: stretch; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <h1>Release Validation Report</h1>
+  <div class="header-meta">
+    <span>📄 {{ meta.input_filename }}</span>
+    <span>⏱ Generated {{ meta.generated_at }}</span>
+    <span>⚙️ {{ meta.config_path }}</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ── Summary Dashboard ── -->
+  <div class="summary-grid">
+    <div class="stat-card total">
+      <div class="stat-value">{{ summary.total }}</div>
+      <div class="stat-label">Total Cards</div>
+    </div>
+    <div class="stat-card ok">
+      <div class="stat-value">{{ summary.ok_count }}</div>
+      <div class="stat-label">✅ OK</div>
+    </div>
+    <div class="stat-card missing">
+      <div class="stat-value">{{ summary.error_count }}</div>
+      <div class="stat-label">❌ Errors</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-value">{{ summary.not_found_count }}</div>
+      <div class="stat-label">⚠️ Commit Missing</div>
+    </div>
+
+    <div class="stat-card orphan">
+      <div class="stat-value">{{ summary.orphan_count }}</div>
+      <div class="stat-label">👻 Orphans</div>
+    </div>
+  </div>
+
+  <!-- ── Repository Status ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Repository Status</span>
+    </div>
+    <div class="section-body">
+      <div class="repo-grid">
+        {% for r in repo_infos %}
+        <div class="repo-card{% if r.branch_fallback %} fallback{% endif %}">
+          <div class="repo-name">
+            <span class="repo-dot {% if r.branch_fallback %}dot-warn{% else %}dot-ok{% endif %}"></span>
+            {{ r.name }}
+            {% if r.branch_fallback %}<span class="chip-warn">fallback</span>{% endif %}
+          </div>
+          <div class="repo-meta">
+            <span>Branch: <code>{{ r.branch }}</code></span>
+            <span>Last commit: {{ r.last_commit_date }}</span>
+            <span>
+              {% if r.open_pr_count > 0 %}
+              <span class="pr-badge">{{ r.open_pr_count }} open PR{% if r.open_pr_count != 1 %}s{% endif %}</span>
+              {% else %}
+              No open PRs
+              {% endif %}
+              &nbsp;·&nbsp; {{ r.commit_count }} commits fetched
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main Validation Table ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Validation Results</span>
+      <span class="row-count" id="rowCount"></span>
+    </div>
+
+    <!-- Status Legend -->
+    <div class="legend">
+      <strong style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">Status Guide</strong>
+      <span class="legend-sep">|</span>
+      <span class="legend-item"><span class="badge badge-ok">✅ OK</span> Found in release branch</span>
+      <span class="legend-sep">·</span>
+      <span class="legend-item"><span class="badge badge-error">❌ In previous</span> Shipped in last release, not this one</span>
+      <span class="legend-sep">·</span>
+      <span class="legend-item"><span class="badge badge-error">❌ Extra commits</span> Develop has additional commits beyond the release branch</span>
+      <span class="legend-sep">·</span>
+      <span class="legend-item"><span class="badge badge-error">❌ Only in develop</span> Merged to develop but not yet in release branch</span>
+      <span class="legend-sep">·</span>
+      <span class="legend-item"><span class="badge badge-warning">⚠️ Commit Missing</span> Not found in any branch</span>
+      <span class="legend-sep">·</span>
+      <span class="legend-item"><span class="badge badge-error">❌ Unexpected</span> Found in a repo not matching this card's release version</span>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <span class="filter-label">Filter:</span>
+      <input id="f-team" placeholder="Team" oninput="applyFilters()" />
+      <input id="f-title" placeholder="Card title" oninput="applyFilters()" />
+      <input id="f-lane" placeholder="Lane status" oninput="applyFilters()" />
+      <span class="filter-label">Status:</span>
+      <div class="status-filters">
+        <button class="status-btn active" data-level="all" onclick="setStatusFilter(this, 'all')">All</button>
+        <button class="status-btn" data-level="success" onclick="setStatusFilter(this, 'success')">✅ OK</button>
+        <button class="status-btn" data-level="error" onclick="setStatusFilter(this, 'error')">❌ Errors</button>
+        <button class="status-btn" data-level="notfound" onclick="setStatusFilter(this, 'notfound')">⚠️ Commit Missing</button>
+      </div>
+      <button class="clear-btn" onclick="clearFilters()">✕ Clear</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="mainTable">
+        <colgroup>
+          <col class="col-team">
+          <col class="col-title">
+          <col class="col-lane">
+          <col class="col-release">
+          <col class="col-status">
+        </colgroup>
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)" data-col="0">Team</th>
+            <th onclick="sortTable(1)" data-col="1">Card Title</th>
+            <th onclick="sortTable(2)" data-col="2">Lane</th>
+            <th onclick="sortTable(3)" data-col="3">Release Version</th>
+            <th>Commit Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% set status_hints = {
+            '✅ OK':                'Found in the current release branch',
+            '❌ In previous':       'Shipped in the last release, not this one',
+            '❌ Extra commits':     'Develop has additional commits beyond the release branch',
+            '❌ Only in develop':   'Merged to develop but not yet in the release branch',
+            '⚠️ Commit Missing':   'Not found in any branch',
+            '❌ Unexpected':        'Found in a repo not matching this card\'s release version'
+          } %}
+          {% for row in card_rows %}
+          <tr class="{{ row.row_class }}" data-level="{{ row.overall_level if row.per_repo_results else 'nodata' }}">
+            <td>{{ row.team }}</td>
+            <td title="{{ row.card_title }}{% if row.assignees %} — {{ row.assignees }}{% endif %}">
+              <a class="card-link" href="{{ row.card_url }}" target="_blank" rel="noopener">{{ row.card_title }}</a>
+            </td>
+            <td>{{ row.lane_title }}</td>
+            <td style="font-size:12px">{{ row.release_version }}</td>
+            <td>
+              <div class="status-cell">
+                {% if row.per_repo_results %}
+                  {% set ns = namespace(shown_missing=false) %}
+                  {% for r in row.per_repo_results %}
+                    {% if r.status_level == 'notfound' %}
+                      {% if not ns.shown_missing %}
+                        {% set ns.shown_missing = true %}
+                        <span class="badge {{ r.badge_class }}" title="{{ status_hints[r.status_label] if r.status_label in status_hints else r.status_label }}">{{ r.status_label }}</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="badge {{ r.badge_class }}" title="{{ r.repo_name }}: {{ status_hints[r.status_label] if r.status_label in status_hints else r.status_label }}">{{ r.repo_name }} {{ r.status_label }}</span>
+                    {% endif %}
+                  {% endfor %}
+                {% else %}
+                  <span class="badge badge-nodata">No release version</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if not card_rows %}
+    <div class="empty-state"><div class="empty-icon">📋</div><div>No cards found in the input file.</div></div>
+    {% endif %}
+  </div>
+
+  <!-- ── Orphan Commits ── -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">👻 Orphan Commits (PVE Web)</span>
+      {% if orphan_rows %}<span class="badge badge-error">{{ orphan_rows|length }} orphan{% if orphan_rows|length != 1 %}s{% endif %}</span>{% endif %}
+    </div>
+    <div class="section-body">
+      {% if orphan_rows %}
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
+        These PAP IDs appear in the current release branch but were not found in the planning Excel. They may represent unplanned work.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Card ID</th><th>Card URL</th><th>Commit</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for o in orphan_rows %}
+            <tr class="row-error">
+              <td class="td-id">{{ o.card_id }}</td>
+              <td><a class="card-link" href="{{ o.card_url }}" target="_blank">{{ o.card_url }}</a></td>
+              <td>
+                {% if o.commit_url %}
+                <a class="card-link" href="{{ o.commit_url }}" target="_blank">View commit →</a>
+                {% else %}—{% endif %}
+              </td>
+              <td><span class="badge badge-error">❌ Orphaned commit</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state"><div class="empty-icon">✨</div><div>No orphan commits detected.</div></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Email Body ── -->
+  <div class="section">
+    <div class="section-header"><span class="section-title">📧 Email Body</span></div>
+    <div class="section-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Copy and paste into your release status email.</p>
+      <div class="email-wrap">
+        <button class="copy-btn" id="copyBtn" onclick="copyEmail()">Copy</button>
+        <pre class="email-pre" id="emailPre">{{ email_body }}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Release Validation Report · Generated {{ meta.generated_at }} · Python Release Report</div>
+</div>
+
+<script>
+  // ── Row count ──
+  function updateRowCount() {
+    const tbody = document.getElementById('tableBody');
+    const visible = [...tbody.rows].filter(r => !r.classList.contains('hidden')).length;
+    const total = tbody.rows.length;
+    document.getElementById('rowCount').textContent = visible === total
+      ? `${total} cards`
+      : `${visible} of ${total} cards`;
+  }
+
+  // ── Filters ──
+  let activeStatus = 'all';
+
+  function setStatusFilter(btn, level) {
+    activeStatus = level;
+    document.querySelectorAll('.status-btn').forEach(b => {
+      b.classList.remove('active','active-ok','active-error','active-notfound');
+    });
+    const cls = level === 'success' ? 'active-ok'
+      : level === 'error' ? 'active-error'
+      : level === 'notfound' ? 'active-notfound'
+      : 'active';
+    btn.classList.add(cls);
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const team = document.getElementById('f-team').value.toLowerCase();
+    const title = document.getElementById('f-title').value.toLowerCase();
+    const lane = document.getElementById('f-lane').value.toLowerCase();
+
+    const tbody = document.getElementById('tableBody');
+    for (const row of tbody.rows) {
+      const cells = row.cells;
+      const rowLevel = row.dataset.level || 'nodata';
+
+      const matchStatus = activeStatus === 'all' || rowLevel === activeStatus;
+      const matchTeam = !team || cells[0].textContent.toLowerCase().includes(team);
+      const matchTitle = !title || cells[1].textContent.toLowerCase().includes(title);
+      const matchLane = !lane || cells[2].textContent.toLowerCase().includes(lane);
+
+      row.classList.toggle('hidden', !(matchStatus && matchTeam && matchTitle && matchLane));
+    }
+    updateRowCount();
+  }
+
+  function clearFilters() {
+    ['f-team','f-title','f-lane'].forEach(id => document.getElementById(id).value = '');
+    activeStatus = 'all';
+    document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active','active-ok','active-warning','active-missing'));
+    document.querySelector('[data-level="all"]').classList.add('active');
+    applyFilters();
+  }
+
+  // ── Sort ──
+  let sortCol = -1, sortAsc = true;
+
+  function sortTable(col) {
+    const tbody = document.getElementById('tableBody');
+    const rows = [...tbody.rows];
+    const ths = document.querySelectorAll('#mainTable thead th');
+
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = true;
+    }
+
+    ths.forEach((th, i) => {
+      th.classList.remove('sorted-asc','sorted-desc');
+      if (i === col) th.classList.add(sortAsc ? 'sorted-asc' : 'sorted-desc');
+    });
+
+    rows.sort((a, b) => {
+      const av = a.cells[col]?.textContent.trim() ?? '';
+      const bv = b.cells[col]?.textContent.trim() ?? '';
+      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  // ── Copy email ──
+  function copyEmail() {
+    const text = document.getElementById('emailPre').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  // ── Init ──
+  updateRowCount();
+</script>
+</body>
+</html>
