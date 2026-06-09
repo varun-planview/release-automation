@@ -255,13 +255,13 @@
       <span class="legend-sep">|</span>
       <span class="legend-item"><span class="badge badge-ok">✅ OK</span> Found in release branch</span>
       <span class="legend-sep">·</span>
-      <span class="legend-item"><span class="badge badge-error">❌ In previous</span> Shipped in last release, not this one</span>
+      <span class="legend-item"><span class="badge badge-error">❌ In previous</span> Shipped in last release</span>
       <span class="legend-sep">·</span>
       <span class="legend-item"><span class="badge badge-error">❌ Extra commits</span> Develop has additional commits beyond the release branch</span>
       <span class="legend-sep">·</span>
       <span class="legend-item"><span class="badge badge-error">❌ Only in develop</span> Merged to develop but not yet in release branch</span>
       <span class="legend-sep">·</span>
-      <span class="legend-item"><span class="badge badge-warning">⚠️ Commit Missing</span> Not found in any branch</span>
+      <span class="legend-item"><span class="badge badge-warning">⚠️ Commit Missing</span> No commits found</span>
       <span class="legend-sep">·</span>
       <span class="legend-item"><span class="badge badge-error">❌ Unexpected</span> Found in a repo not matching this card's release version</span>
     </div>
@@ -303,10 +303,10 @@
         <tbody id="tableBody">
           {% set status_hints = {
             '✅ OK':                'Found in the current release branch',
-            '❌ In previous':       'Shipped in the last release, not this one',
+            '❌ In previous':       'Shipped in last release',
             '❌ Extra commits':     'Develop has additional commits beyond the release branch',
             '❌ Only in develop':   'Merged to develop but not yet in the release branch',
-            '⚠️ Commit Missing':   'Not found in any branch',
+            '⚠️ Commit Missing':   'No commits found',
             '❌ Unexpected':        'Found in a repo not matching this card\'s release version'
           } %}
           {% for row in card_rows %}

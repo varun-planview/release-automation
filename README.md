@@ -72,10 +72,10 @@ For repositories with a dedicated release branch (e.g. PVE Web):
 | Status | Meaning |
 |--------|---------|
 | ✅ OK | PAP ID found in the current release branch |
-| ❌ In previous | Found in the previous release branch, not this one |
+| ❌ In previous | Shipped in last release |
 | ❌ Extra commits | Develop has additional commits beyond the release branch |
 | ❌ Only in develop | Merged to develop but not yet in the release branch |
-| ⚠️ Commit Missing | Not found in any branch |
+| ⚠️ Commit Missing | No commits found |
 
 ### Develop-Based Validation
 
