@@ -47,7 +47,7 @@ The script provides detailed commit status with concise warning messages:
 | ⚠️ **In previous** | Code exists in previous release branch |
 | ⚠️ **Extra commits** | Additional commits in develop branch not in current release |
 | ⚠️ **Only in develop** | Code found in develop but missing from release branch |
-| ⚠️ **Orphaned commit** | Code exists but card missing from planning |
+| ⚠️ **Orphaned commit** | Commit exists in release branch but card does not have the current release version assigned |
 
 ## Prerequisites & Setup
 
@@ -95,7 +95,7 @@ The script uses two configuration files (attach both to this Confluence page):
 #### Excel Output Sheets
 - **Report Sheet**: Main data with PAP ID validation and GitHub status
 - **GitHub Sheet**: Repository information (branches, last commit dates, PR counts)
-- **Orphan Commits Sheet**: PAP IDs found in code but missing from planning
+- **Orphan Commits Sheet**: Commits found in the release branch whose card does not have the current release version assigned
 
 #### Email Body Content
 - **TO DO**: Development tasks requiring completion

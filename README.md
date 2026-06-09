@@ -5,7 +5,7 @@
 **generate_report.py** validates PAP IDs from a Planview Excel export against GitHub repositories and produces a self-contained interactive HTML report. It transforms manual release validation from hours of work into a single command.
 
 - **Validates commit presence** across multiple GitHub repositories
-- **Detects orphan commits** — PAP IDs in repos that are missing from the planning spreadsheet
+- **Detects orphan commits** — commits in the current release branch whose card does not have the current release version assigned
 - **Generates an interactive HTML report** with filtering, sorting, and status badges
 - **Produces formatted email body text** for release status communications
 
@@ -96,7 +96,7 @@ When a card has results across multiple repositories, `notfound` results are sup
 
 ### Orphan Detection
 
-PAP IDs found in the current release branch of PVE Web that are absent from the Excel export are reported as orphan commits in the HTML report.
+Commits found in the current release branch of PVE Web where the associated card does not have the current release version assigned are reported as orphan commits in the HTML report.
 
 ## Troubleshooting
 

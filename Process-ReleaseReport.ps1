@@ -619,7 +619,7 @@ if ($pveWebRepo -and $allRepositoryCommits.ContainsKey("PVE Web")) {
             'PAP ID' = $orphan
             'Card URL' = $cardUrl
             'Commit URL' = $commitUrl
-            'Commit Status' = "⚠️ Orphaned commit"
+            'Commit Status' = "⚠️ Release version not assigned"
         }
     }
 } else {

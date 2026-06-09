@@ -355,7 +355,7 @@
     <div class="section-body">
       {% if orphan_rows %}
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
-        These PAP IDs appear in the current release branch but were not found in the planning Excel. They may represent unplanned work.
+        These commits appear in the current release branch, but the associated card does not have the current release version assigned. The card exists in the planning data but is not tagged for this release.
       </p>
       <div class="table-wrap">
         <table>
@@ -370,7 +370,7 @@
                 <a class="card-link" href="{{ o.commit_url }}" target="_blank">View commit →</a>
                 {% else %}—{% endif %}
               </td>
-              <td><span class="badge badge-error">❌ Orphaned commit</span></td>
+              <td><span class="badge badge-error">❌ Release version not assigned</span></td>
             </tr>
             {% endfor %}
           </tbody>
