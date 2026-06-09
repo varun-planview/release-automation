@@ -33,7 +33,7 @@ The **Process-ReleaseReport.ps1** script is a comprehensive PowerShell automatio
 4. **Smart Validation Logic**
    - **Branch-based validation**: For release repositories (PVE Web, Analytics, Polaris, Dovetail)
    - **Develop-based validation**: For continuous deployment repositories (ActionBoard)
-   - **Orphan detection**: Finds commits in repositories missing from planning
+   - **Orphan detection**: Finds commits in the release branch whose card does not have the current release version assigned
 
 ### Validation Status Messages
 
